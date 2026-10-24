@@ -1,0 +1,217 @@
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "QIU_Script"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local purple = Color3.fromRGB(105, 65, 180)
+local dark = Color3.fromRGB(30, 24, 42)
+local currentPage = "玩家"
+local humanoid, character
+local infiniteJump, noclip = false, false
+local savedCollisions = {}
+
+local function bindCharacter(char)
+    character = char
+    humanoid = char:WaitForChild("Humanoid")
+end
+
+if player.Character then bindCharacter(player.Character) end
+player.CharacterAdded:Connect(bindCharacter)
+
+local window = Instance.new("Frame", gui)
+window.Size = UDim2.fromOffset(340, 390)
+window.Position = UDim2.new(0.5, -170, 0.5, -195)
+window.BackgroundColor3 = dark
+window.BorderSizePixel = 0
+Instance.new("UICorner", window).CornerRadius = UDim.new(0, 8)
+
+local header = Instance.new("TextButton", window)
+header.Size = UDim2.new(1, 0, 0, 42)
+header.BackgroundColor3 = purple
+header.Text = "QIU Script     [−]"
+header.TextColor3 = Color3.new(1, 1, 1)
+header.TextSize = 18
+
+local body = Instance.new("Frame", window)
+body.Position = UDim2.fromOffset(0, 42)
+body.Size = UDim2.new(1, 0, 1, -42)
+body.BackgroundTransparency = 1
+
+local nav = Instance.new("Frame", body)
+nav.Size = UDim2.new(1, 0, 0, 38)
+nav.BackgroundTransparency = 1
+
+local content = Instance.new("ScrollingFrame", body)
+content.Position = UDim2.fromOffset(0, 42)
+content.Size = UDim2.new(1, 0, 1, -42)
+content.BackgroundTransparency = 1
+content.BorderSizePixel = 0
+content.ScrollBarThickness = 4
+content.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local layout = Instance.new("UIListLayout", content)
+layout.Padding = UDim.new(0, 7)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
+end)
+
+local function clear()
+    for _, v in ipairs(content:GetChildren()) do
+        if v:IsA("GuiObject") then v:Destroy() end
+    end
+end
+
+local function button(text, callback)
+    local b = Instance.new("TextButton", content)
+    b.Size = UDim2.new(1, -16, 0, 38)
+    b.BackgroundColor3 = Color3.fromRGB(49, 39, 65)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.TextSize = 15
+    b.Text = text
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+    b.Activated:Connect(callback)
+    return b
+end
+
+local function input(label, initial, callback)
+    local box = Instance.new("TextBox", content)
+    box.Size = UDim2.new(1, -16, 0, 38)
+    box.BackgroundColor3 = Color3.fromRGB(49, 39, 65)
+    box.TextColor3 = Color3.new(1, 1, 1)
+    box.PlaceholderColor3 = Color3.fromRGB(200, 190, 210)
+    box.TextSize = 14
+    box.Text = tostring(initial)
+    box.PlaceholderText = label
+    box.ClearTextOnFocus = false
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 5)
+    box.FocusLost:Connect(function()
+        local n = tonumber(box.Text)
+        if n then callback(n) else box.Text = tostring(initial) end
+    end)
+end
+
+local function toggle(label, callback)
+    local enabled = false
+    local b
+    b = button(label .. ": 关闭", function()
+        enabled = not enabled
+        b.Text = label .. (enabled and ": 开启" or ": 关闭")
+        callback(enabled)
+    end)
+end
+
+local function showPage(page)
+    currentPage = page
+    clear()
+
+    if page == "玩家" then
+        input("移速", 16, function(n)
+            if humanoid then humanoid.WalkSpeed = math.clamp(n, 0, 200) end
+        end)
+        input("跳跃力度", 50, function(n)
+            if humanoid then
+                humanoid.UseJumpPower = true
+                humanoid.JumpPower = math.clamp(n, 0, 300)
+            end
+        end)
+        input("世界重力", workspace.Gravity, function(n)
+            workspace.Gravity = math.clamp(n, 0, 500)
+        end)
+    elseif page == "功能" then
+        toggle("无限跳", function(v) infiniteJump = v end)
+        toggle("穿墙", function(v)
+            noclip = v
+            if not v then
+                for part, old in pairs(savedCollisions) do
+                    if part.Parent then part.CanCollide = old end
+                end
+                table.clear(savedCollisions)
+            end
+        end)
+    else
+        button("缩小 / 恢复窗口", function()
+            body.Visible = not body.Visible
+            window.Size = body.Visible and UDim2.fromOffset(340, 390)
+                or UDim2.fromOffset(340, 42)
+            header.Text = body.Visible and "QIU Script     [−]"
+                or "QIU Script     [+]"
+        end)
+        button("恢复窗口位置", function()
+            window.Position = UDim2.new(0.5, -170, 0.5, -195)
+        end)
+    end
+end
+
+for i, name in ipairs({"玩家", "功能", "界面"}) do
+    local b = Instance.new("TextButton", nav)
+    b.Position = UDim2.new((i - 1) / 3, 0, 0, 0)
+    b.Size = UDim2.new(1 / 3, 0, 1, 0)
+    b.BackgroundColor3 = purple
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Text = name
+    b.TextSize = 14
+    b.Activated:Connect(function() showPage(name) end)
+end
+
+header.Activated:Connect(function()
+    body.Visible = not body.Visible
+    window.Size = body.Visible and UDim2.fromOffset(340, 390)
+        or UDim2.fromOffset(340, 42)
+    header.Text = body.Visible and "QIU Script     [−]"
+        or "QIU Script     [+]"
+end)
+
+-- 触屏和鼠标拖动窗口
+local dragging, dragStart, startPos
+header.InputBegan:Connect(function(inputObject)
+    if inputObject.UserInputType == Enum.UserInputType.MouseButton1
+    or inputObject.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = inputObject.Position
+        startPos = window.Position
+    end
+end)
+UIS.InputChanged:Connect(function(inputObject)
+    if dragging and (inputObject.UserInputType == Enum.UserInputType.MouseMovement
+    or inputObject.UserInputType == Enum.UserInputType.Touch) then
+        local delta = inputObject.Position - dragStart
+        window.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+UIS.InputEnded:Connect(function(inputObject)
+    if inputObject.UserInputType == Enum.UserInputType.MouseButton1
+    or inputObject.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UIS.JumpRequest:Connect(function()
+    if infiniteJump and humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if noclip and character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if savedCollisions[part] == nil then
+                    savedCollisions[part] = part.CanCollide
+                end
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+showPage("玩家")
